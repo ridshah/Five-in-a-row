@@ -1,0 +1,308 @@
+<!-- Substitute the real ip address on which the server is hosted in place of [IP_ADDRESS] in the url -->
+<html>
+<head>
+    <style>
+        table,
+        td {
+            border: 1px solid black;
+        }
+        
+        table {
+            width: 50%;
+            height: 75%;
+        }
+    </style>
+    <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+    <script>
+		var column_num;
+		var row_num;
+		var td_id;
+		var isStarted = false;
+		var intervalObj = null;
+		function drawBoard() {
+		    var board = document.getElementById("table_tag");
+			if (board != null || board != undefined) {
+				board.remove();
+			}
+			var boardContainer = document.getElementById("boardContainer");
+			if (boardContainer != null || boardContainer != undefined) {
+			var table_create = document.createElement("table");
+				table_create.setAttribute("id", "table_tag");
+				table_create.setAttribute("align", "center");
+				boardContainer.appendChild(table_create);
+				for (var i = 0; i < 19; i++) {
+					var tr_tag_create = document.createElement("tr");
+					tr_tag_create.setAttribute("id", "tr_tag");
+					for (var j = 0; j < 19; j++) {
+						var td_tag_create = document.createElement("td");
+						td_tag_create.setAttribute("id", i + "_" + j);
+						td_tag_create.setAttribute("style", "width:30px;height:30px;");
+						tr_tag_create.appendChild(td_tag_create);
+						document.getElementById("table_tag").appendChild(tr_tag_create);
+					}
+				}
+			}
+		}
+        $(document).ready(function() {
+			var isFirst = 'N';
+			var isSecond = 'N';
+			drawBoard();
+			$("#start").click(function() {
+				var url = "http://[IP_ADDRESS]:8080/start";
+				var method = "POST";
+				var request = new XMLHttpRequest();
+					request.onreadystatechange = function() {
+						if (request.readyState == 4 && request.status == 200) {
+							var response = request.responseText;
+							var data = response.split(';');
+							isFirst = data[0];
+							isSecond = data[1];
+							isStarted = true;
+							broadcasteData();
+						}
+					}
+					request.open(method, url, true);
+					request.send(JSON.stringify('start'));
+			});
+			$("#reset").click(function() {
+				if (intervalObj != null) {
+					clearInterval(intervalObj);
+				}
+				var url = "http://[IP_ADDRESS]:8080/reset";
+				var method = "POST";
+				var request = new XMLHttpRequest();
+					request.onreadystatechange = function() {
+						if (request.readyState == 4 && request.status == 200) {
+							var response = request.responseText;
+							var data = response.split(';');
+							isFirst = data[0];
+							isSecond = data[1];
+							setImage(data[2]);
+							isStarted = false;
+						}
+					}
+					request.open(method, url, true);
+					request.send(JSON.stringify('start'));
+			});
+            $("#table_tag td").click(function() {
+				debugger;
+				if (isStarted) {
+					if (intervalObj != null) {
+						clearInterval(intervalObj);
+					}
+					column_num = parseInt($(this).index());
+					row_num = parseInt($(this).parent().index());
+					var url = "http://[IP_ADDRESS]:8080/checkstatus";
+					var method = "POST";
+					var postData = {'isFirst': isFirst, 'isSecond': isSecond};
+					var request = new XMLHttpRequest();
+					request.onreadystatechange = function() {
+						if (request.readyState == 4 && request.status == 200) {
+							var response = request.responseText;
+							if (response == 'Y') {
+								updateBox();
+							}
+							else {
+								alert('Wait for the other player to make the move');
+							}
+							
+						}
+					}
+					request.open(method, url, true);
+					request.send(JSON.stringify(postData));
+				}
+				else {
+					alert('Click on start button to start');
+				}
+            });
+        });
+		function updateBox() {
+			td_id = row_num + "_" + column_num;
+			var url = "http://[IP_ADDRESS]:8080/update";
+			var method = "POST";
+			var postData = {'td': td_id};
+			var async = false;
+			var request = new XMLHttpRequest();
+			request.onreadystatechange = function() {
+				if (request.readyState == 4 && request.status == 200) {
+					var response = request.responseText;
+					var data = response.split(';');
+					isFirst = data[0];
+					isSecond = data[1];
+					setImage(data[2]);
+					broadcasteData();
+				}
+			}
+			request.open(method, url, true);
+			request.send(JSON.stringify(postData));
+		}
+        function setImage(boxes) {
+			if (boxes != undefined && boxes != '') {
+				var boxArray = boxes.split(',');
+				if (boxArray.length > 0) {
+					var length = boxArray.length
+					for (var i=0; i < length; i++) {
+						var checkiftagpresent = document.getElementById(boxArray[i]).hasChildNodes();
+						if (checkiftagpresent == false) {
+							if (i % 2 == 0) {
+								var x_img = document.getElementById(boxArray[i]);
+								x_img.innerHTML = "X";
+							}
+							if (i % 2 == 1) {
+								var o_img = document.getElementById(boxArray[i]);
+								o_img.innerHTML = "O";
+							}
+							checkforwin();
+						}
+					}
+				}
+			}
+			else {
+				//drawBoard();
+				for (var i = 0; i < 19; i++) {
+					for (var j = 0; j < 19; j++) {
+						var checkiftagpresent = document.getElementById(i+'_'+j).hasChildNodes();
+						if (checkiftagpresent == true) {
+							var x_img = document.getElementById(i+'_'+j);
+							x_img.innerHTML = "";
+						}
+					}
+				}
+				
+			}
+        }
+		function checkforwin(){
+			var n = 5;
+			var movedata = td_id.split('_');
+			var x = movedata[0];
+			var y = movedata[1];
+			var iswon = 0;
+			
+			//check in columns
+			for(var i=0; i<15; i++)
+			{	
+				debugger;
+				var playerx = 0;
+				var playero = 0;
+				var s1 = document.getElementById(x+'_'+i).innerHTML;
+				var s2 = document.getElementById(x+'_'+(i+1)).innerHTML;
+				var s3 = document.getElementById(x+'_'+(i+2)).innerHTML;
+				var s4 = document.getElementById(x+'_'+(i+3)).innerHTML;
+				var s5 = document.getElementById(x+'_'+(i+4)).innerHTML;
+				if (s1.charAt(0) == s2.charAt(0) && s1.charAt(0) == s3.charAt(0) && s1.charAt(0) == s4.charAt(0) && s1.charAt(0) == s5.charAt(0) && s1.length != 0 && s2.length != 0 && s3.length != 0 && s4.length != 0 && s5.length != 0)
+				{
+					alert("Game won");
+					iswon = 1;
+				}
+			}
+			
+			//check in rows
+			for(var i=0; i<15; i++)
+			{	
+				debugger;
+				var playerx = 0;
+				var playery = 0;
+				var s1 = document.getElementById(i+'_'+y).innerHTML;
+				var s2 = document.getElementById((i+1)+'_'+y).innerHTML;
+				var s3 = document.getElementById((i+2)+'_'+y).innerHTML;
+				var s4 = document.getElementById((i+3)+'_'+y).innerHTML;
+				var s5 = document.getElementById((i+4)+'_'+y).innerHTML;
+				if (s1.charAt(0) == s2.charAt(0) && s1.charAt(0) == s3.charAt(0) && s1.charAt(0) == s4.charAt(0) && s1.charAt(0) == s5.charAt(0) && s1.length != 0 && s2.length != 0 && s3.length != 0 && s4.length != 0 && s5.length != 0)
+				{
+					alert("Game won");
+					iswon = 1;
+				}
+			}
+			
+			//check in diagonal			
+			for(i=0;i<15;i++)
+			{
+				for(j=0;j<15;j++)
+				{
+					var s1 = document.getElementById(i+'_'+j).innerHTML;
+					var s2 = document.getElementById((i+1)+'_'+(j+1)).innerHTML;
+					var s3 = document.getElementById((i+2)+'_'+(j+2)).innerHTML;
+					var s4 = document.getElementById((i+3)+'_'+(j+3)).innerHTML;
+					var s5 = document.getElementById((i+4)+'_'+(j+4)).innerHTML;
+					if (s1.charAt(0) == s2.charAt(0) && s1.charAt(0) == s3.charAt(0) && s1.charAt(0) == s4.charAt(0) && s1.charAt(0) == s5.charAt(0) && s1.length != 0 && s2.length != 0 && s3.length != 0 && s4.length != 0 && s5.length != 0)
+					{
+						alert("Game won");
+						iswon = 1;
+					}
+				}
+			}
+			
+			//check in anti-diagonal
+			for(i=0;i<15;i++)
+			{
+				for(j=4;j<19;j++)
+				{
+					var s1 = document.getElementById(i+'_'+j).innerHTML;
+					var s2 = document.getElementById((i+1)+'_'+(j-1)).innerHTML;
+					var s3 = document.getElementById((i+2)+'_'+(j-2)).innerHTML;
+					var s4 = document.getElementById((i+3)+'_'+(j-3)).innerHTML;
+					var s5 = document.getElementById((i+4)+'_'+(j-4)).innerHTML;
+					if (s1.charAt(0) == s2.charAt(0) && s1.charAt(0) == s3.charAt(0) && s1.charAt(0) == s4.charAt(0) && s1.charAt(0) == s5.charAt(0) && s1.length != 0 && s2.length != 0 && s3.length != 0 && s4.length != 0 && s5.length != 0)
+					{
+						alert("Game won");
+						iswon = 1;
+					}
+				}
+			}
+			
+			if(iswon == 0)
+			{
+				var all = 0;
+				for(i=0; i<19; i++)
+				{
+					for(j=0; j<19; j++)
+					{
+						var s1 = document.getElementById(i+'_'+j).innerHTML;
+						if(s1.length!=0)
+						{
+							all = all+1;
+						}
+					}
+				}
+				if(all == 361)
+				{
+					alert('Nobody won. Game draw.');
+				}
+			}
+		}
+		function broadcasteData() {
+			intervalObj = setInterval(function(){ 
+				var url = "http://[IP_ADDRESS]:8080/broadcaste";
+				var method = "POST";
+				var request = new XMLHttpRequest();
+				request.onreadystatechange = function() {
+					if (request.readyState == 4 && request.status == 200) {
+						debugger;
+						console.log('r'+ request.responseText);
+						var response = request.responseText;
+						var data = response.split(';');
+						if (data[0] == 'N' && data[1] == 'N') {
+							isFirst = data[0];
+							isSecond = data[1];
+							isStarted = false;
+							if (intervalObj != null) {
+								clearInterval(intervalObj);
+							}
+						}
+						setImage(data[2]);
+					}
+				}
+				request.open(method, url, true);
+				request.send();
+			}, 2000);
+		}
+    </script>
+</head>
+
+<body>
+	<center><input type="button" id="start" value ="Start" />
+	<input type="button" id="reset" value ="Reset" /></center>
+	<div id = "boardContainer" >
+	</div>
+</body>
+</html>
